@@ -32,9 +32,13 @@
 >   the end of every session.
 > - **Markdown export.** Every finished meeting can be written to a folder as a `.md` file
 >   (`GHOSTMEET_EXPORT_DIR`), ready to be read by Claude Code, Codex or any other agent.
-> - **Simpler side panel.** No Summarize, Clear or language buttons: summarise the exported
+> - **Out of the way.** The side panel only opens when you ask for it; the popup shows
+>   whether it is recording, for how long and how much is transcribed, then how the
+>   transcription ended. No Summarize, Clear or language buttons: summarise the exported
 >   markdown with the agent of your choice, and set the meeting language once in `.env`
 >   (`GHOSTMEET_LANGUAGE`, e.g. `pt`).
+> - **In Portuguese.** The interface comes from `extension/_locales/` (Brazilian
+>   Portuguese today; a language is one more `messages.json`).
 > - **More reliable capture.** The capture state survives Chrome putting the service
 >   worker to sleep during long meetings, Stop always stops the recorder, and a recorder
 >   left over from a previous session no longer corrupts the next one.
@@ -142,14 +146,17 @@ Note: First run downloads the Whisper model (~150MB for `base`).
 ### 3) Use it
 
 1. **Join a meeting** — Open Google Meet, Zoom, Teams (or any tab with audio)
-2. **Click 👻** — Side panel opens on the right
-3. **Click ▶ Start** — Live captions appear as people speak. The tab stays audible.
+2. **Click 👻** — The popup says whether it is recording
+3. **Click ▶ Iniciar gravação** — Recording starts quietly: a red dot on the icon is the
+   only sign, and the tab stays audible. **Ver transcrição ao vivo** opens the side panel
+   with live captions if you want to watch them.
    The first time, a tab asks for your microphone so your own voice is transcribed too.
    Headphones keep the others from being picked up a second time through your speakers.
    To have recording follow the call instead, tick **Start and stop with the call** in the
    popup: from then on, opening the popup once on a Meet tab (lobby or call) is enough;
    if you join without it, the icon shows **REC** to ask for that click.
-4. **Click ■ Stop** — The panel says "Transcription complete" once the last pass finishes
+4. **Click ■ Parar gravação** — The popup says the transcription is being finished, then
+   shows its length and how many segments it has
 5. **Read the transcript** — in the side panel, through the API, or as markdown in
    `GHOSTMEET_EXPORT_DIR` if you set it. Summarise it with the AI agent of your choice.
 
@@ -230,7 +237,8 @@ a throwaway data folder and checks, with Chromium's fake microphone, that your v
 reaches the recording and that a capture survives the backend restarting mid-meeting.
 `node tests/extension/verify-follow-call.mjs` serves a stand-in Meet page and checks that
 joining and leaving are noticed, that the session takes the meeting's name and that a
-short capture is dropped (it needs port 8877 free: stop your own backend while it runs).
+short capture is dropped. `node tests/extension/verify-popup.mjs` drives the popup through
+a whole capture. These two need port 8877 free: stop your own backend while they run.
 To check the last step by hand: start a capture on a tab with audio and confirm
 `audio_bytes` climbs in `/api/sessions` — and that you can still hear the tab.
 
@@ -253,9 +261,10 @@ legacy/
 │   ├── meet-call.js        # Meet content script: join/leave and the meeting's name
 │   ├── meet-speakers.js    # Meet content script: participant audio indicators
 │   ├── mic-permission.*    # the page where the microphone is granted once
-│   ├── popup.html/js       # start/stop controls
+│   ├── popup.*             # what the capture is doing, and Start or Stop
+│   ├── i18n.js, _locales/  # interface text (pt_BR)
 │   ├── shared.js           # pure helpers shared by the above
-│   └── icons/
+│   └── icons/              # drawn by tools/make_icons.py (Noto Color Emoji, Apache-2.0)
 ├── backend/                # Python backend (FastAPI)
 │   ├── app.py              # HTTP + WebSocket server
 │   ├── decoder.py          # streaming webm/opus → PCM (one demuxer per session)
