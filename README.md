@@ -62,8 +62,8 @@
 >   microphone, a backend restart mid-meeting, following a Meet call and the popup (see
 >   [Development](#development)).
 >
-> Summaries are still in the backend (`POST /api/sessions/{id}/summarize`, with
-> `GHOSTMEET_ANTHROPIC_KEY`), but the extension no longer has a button for them.
+> There is no built-in summary any more, nor any call to a cloud API: the transcript
+> is meant for the AI agent of your choice (see `GHOSTMEET_ON_EXPORT`).
 
 > **Renewing as MeetButler.** ghostmeet is becoming MeetButler, a desktop app for Windows
 > and macOS that records in-person meetings as well as web calls, fully on your machine.
@@ -118,8 +118,8 @@ Local Backend (FastAPI)
     └── on stop ──→ speaker names ──→ markdown export (or dropped if too short)
 ```
 
-Everything runs on your machine. Nothing is sent anywhere, unless you call the backend's
-optional summary endpoint, which uses the Claude API.
+Everything runs on your machine, and the backend never calls out: no cloud API, no
+telemetry. What happens to a transcript afterwards is up to you.
 
 Audio is decoded once as it arrives and kept on disk, and each transcription pass reads
 only a bounded window of it. That is what keeps a long meeting from getting slower and
@@ -211,7 +211,6 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_ON_EXPORT` | — | Shell command run after each export, with `GHOSTMEET_TRANSCRIPT` & co. in its environment |
 | `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Where the SQLite database and per-session files live |
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
-| `GHOSTMEET_ANTHROPIC_KEY` | — | Only for the optional summary endpoint |
 | `GHOSTMEET_HOST` | `127.0.0.1` | Server bind address (loopback — the API has no auth) |
 | `GHOSTMEET_PORT` | `8877` | Server port |
 
@@ -229,15 +228,13 @@ Set these in `.env` or `docker-compose.yml`:
 | `/api/sessions` | GET | List all sessions |
 | `/api/sessions/{id}` | GET | Session details |
 | `/api/sessions/{id}/transcript` | GET | Full transcript |
-| `/api/sessions/{id}/summarize` | POST | Generate AI summary |
-| `/api/sessions/{id}/summary` | GET | Get generated summary |
 | `/api/sessions/{id}/meeting` | POST | Meeting name, code and participants from the meeting page (`{"title", "code", "participants"}`) |
 | `/api/sessions/{id}/notes` | GET / POST | Marks and notes taken during the meeting (`{"text", "at"}`, `at` in epoch ms) |
 | `/api/sessions/{id}/speaker-events` | POST | Google Meet participant UI changes, used to name speakers |
 | `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish; `resume=<epoch ms>` continues a dropped session) |
 | `/ws/transcript/{id}` | WS | Live transcript stream |
 
-Sessions, transcripts and summaries are stored in `recordings/ghostmeet.db` (or under
+Sessions, transcripts and notes are stored in `recordings/ghostmeet.db` (or under
 `GHOSTMEET_DATA_DIR`), so every endpoint above keeps working after the backend restarts.
 
 ## Development
@@ -308,14 +305,13 @@ legacy/
 │   ├── incremental.py      # bounded-window transcription, absolute timestamps
 │   ├── pipeline.py         # receive / decode / transcribe, decoupled
 │   ├── transcriber.py      # shared Whisper model + per-session language
-│   ├── store.py            # SQLite: sessions, segments, summaries
+│   ├── store.py            # SQLite: sessions, segments, notes
 │   ├── exporter.py         # markdown copy of finished transcripts
 │   ├── speakers.py         # names each segment from the Meet audio indicators
 │   ├── retention.py        # which finished captures are worth keeping
 │   ├── vocabulary.py       # your terms + participants' names, as Whisper hotwords
 │   ├── refine.py           # optional second pass with a larger model
 │   ├── hooks.py            # GHOSTMEET_ON_EXPORT
-│   ├── summarizer.py       # Claude API integration
 │   └── models.py           # session model
 ├── tests/                  # pytest suite + extension tests
 ├── docker-compose.yml      # one-command deployment
@@ -334,18 +330,18 @@ clawhub install ghostmeet
 
 Then just ask your AI assistant:
 
-- **"Summarize my last meeting"** → generates AI summary from latest session
+- **"Summarize my last meeting"** → the assistant reads the latest transcript and notes and summarises them
 - **"How many meetings did I have today?"** → lists all sessions
-- **"What was discussed?"** → fetches full transcript
-- **"Extract action items"** → pulls tasks from the summary
+- **"What did we decide about X?"** → searches the transcripts, with timestamps
+- **"Extract action items"** → reads the transcript and pulls out the tasks
 
-> The skill handles session listing, transcript retrieval, and summary generation via the ghostmeet API. Recording start/stop is done through the Chrome Extension.
+> The skill reads sessions, transcripts and notes through the local ghostmeet API; the assistant does the summarising. Recording start/stop is done through the Chrome Extension.
 
 ## Roadmap
 
 - [x] Real-time transcription (Whisper)
 - [x] Chrome Extension side panel UI
-- [x] AI meeting summaries (Claude)
+- [x] AI meeting summaries (upstream, removed here: your own agent summarises the transcript)
 - [x] Long meetings — flat cost per pass, tested to 4h+ of audio
 - [x] Transcripts survive a restart (SQLite)
 - [x] Per-session language (`GHOSTMEET_LANGUAGE`, or `lang=` on `/ws/audio`)
