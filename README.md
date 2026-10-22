@@ -8,6 +8,26 @@
 
 [Quick Start](#quick-start) • [How It Works](#how-it-works) • [Features](#features) • [API](#api)
 
+> **About this fork.** This is a fork of [Higangssh/ghostmeet](https://github.com/Higangssh/ghostmeet)
+> focused on the v0.1 Chrome extension + Python backend in [`legacy/`](legacy/), kept in
+> sync with upstream. It is tuned for everyday use with Google Meet and plain-text
+> transcripts you can hand to any AI agent:
+>
+> - **No audio is kept.** Only the transcript is stored; the working PCM file is deleted at
+>   the end of every session.
+> - **Markdown export.** Every finished meeting can be written to a folder as a `.md` file
+>   (`GHOSTMEET_EXPORT_DIR`), ready to be read by Claude Code, Codex or any other agent.
+> - **Simpler side panel.** No Summarize, Clear or language buttons: summarise the exported
+>   markdown with the agent of your choice, and set the meeting language once in `.env`
+>   (`GHOSTMEET_LANGUAGE`, e.g. `pt`).
+> - **More reliable capture.** The capture state survives Chrome putting the service
+>   worker to sleep during long meetings, Stop always stops the recorder, and a recorder
+>   left over from a previous session no longer corrupts the next one.
+> - **`start.sh` / `stop.sh`** to run the backend in the background.
+> - **Experimental:** on Google Meet, per-participant UI changes are logged next to the
+>   session (`recordings/<id>.speakers.jsonl`) as raw material for telling speakers apart.
+>   Nothing interprets them yet.
+
 > **Renewing as MeetButler.** ghostmeet is becoming MeetButler, a desktop app for Windows
 > and macOS that records in-person meetings as well as web calls, fully on your machine.
 > It is under development in `app/` and `crates/` and not ready to use yet. The Chrome
@@ -75,7 +95,7 @@ slower, and keeps memory flat no matter how long you record.
 ### 1) Start the backend
 
 ```bash
-git clone https://github.com/Higangssh/ghostmeet.git
+git clone https://github.com/rodrigoveneroso/ghostmeet.git
 cd ghostmeet/legacy
 
 # Copy and edit config (add your Anthropic API key for summaries)
@@ -111,10 +131,10 @@ Note: First run downloads the Whisper model (~150MB for `base`).
 
 1. **Join a meeting** — Open Google Meet, Zoom, Teams (or any tab with audio)
 2. **Click 👻** — Side panel opens on the right
-3. **Pick a language** (optional) — or leave it on Auto-detect
-4. **Click ▶ Start** — Live captions appear as people speak. The tab stays audible.
-5. **Click ■ Stop** — The panel says "Transcription complete" once the last pass finishes
-6. **Click 📋 Summarize** — AI generates a structured summary
+3. **Click ▶ Start** — Live captions appear as people speak. The tab stays audible.
+4. **Click ■ Stop** — The panel says "Transcription complete" once the last pass finishes
+5. **Read the transcript** — in the side panel, through the API, or as markdown in
+   `GHOSTMEET_EXPORT_DIR` if you set it. Summarise it with the AI agent of your choice.
 
 Reopening the side panel mid-meeting brings the transcript so far back with it.
 
@@ -129,7 +149,8 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_MODEL` | `base` | Whisper model size (`tiny` / `base` / `small` / `medium` / `large`) |
 | `GHOSTMEET_DEVICE` | `auto` | Compute device (`auto` / `cpu` / `cuda`) |
 | `GHOSTMEET_COMPUTE_TYPE` | `float32` | Precision (`int8` is much faster on CPU) |
-| `GHOSTMEET_LANGUAGE` | auto-detect | Default language (`en` / `ko` / `ja` / etc.) — the side panel can override it per meeting |
+| `GHOSTMEET_LANGUAGE` | auto-detect | Language of your meetings (`pt` / `en` / `ko` / etc.). There is no picker in the side panel |
+| `GHOSTMEET_EXPORT_DIR` | off | Folder that receives a markdown copy of every finished transcript |
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
 | `GHOSTMEET_ANTHROPIC_KEY` | — | Required for AI summaries |
 | `GHOSTMEET_HOST` | `127.0.0.1` | Server bind address (loopback — the API has no auth) |
@@ -151,6 +172,7 @@ Set these in `.env` or `docker-compose.yml`:
 | `/api/sessions/{id}/transcript` | GET | Full transcript |
 | `/api/sessions/{id}/summarize` | POST | Generate AI summary |
 | `/api/sessions/{id}/summary` | GET | Get generated summary |
+| `/api/sessions/{id}/speaker-events` | POST | Raw Google Meet participant UI changes (experimental) |
 | `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish) |
 | `/ws/transcript/{id}` | WS | Live transcript stream |
 
@@ -200,7 +222,8 @@ legacy/
 │   ├── manifest.json       # permissions + side panel config
 │   ├── background.js       # service worker: gets a tab stream id, drives capture
 │   ├── offscreen.html/js   # hidden page that actually records → WebSocket
-│   ├── sidepanel.html/js   # live captions, language picker, summaries
+│   ├── sidepanel.html/js   # live captions
+│   ├── meet-speakers.js    # Google Meet content script (experimental speaker events)
 │   ├── popup.html/js       # start/stop controls
 │   ├── shared.js           # pure helpers shared by the above
 │   └── icons/
@@ -212,6 +235,7 @@ legacy/
 │   ├── pipeline.py         # receive / decode / transcribe, decoupled
 │   ├── transcriber.py      # shared Whisper model + per-session language
 │   ├── store.py            # SQLite: sessions, segments, summaries
+│   ├── exporter.py         # markdown copy of finished transcripts
 │   ├── summarizer.py       # Claude API integration
 │   └── models.py           # session model
 ├── tests/                  # pytest suite + extension tests
@@ -249,7 +273,7 @@ Then just ask your AI assistant:
 - [ ] Meeting context input + file attach
 - [ ] Speaker diarization (who said what)
 - [ ] In-person meetings (microphone capture)
-- [ ] Export to Markdown / PDF
+- [x] Export to Markdown
 - [ ] Agent Mode — AI speaks in the meeting for you
 
 ## License
