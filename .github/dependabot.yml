@@ -1,0 +1,14 @@
+# Weekly pull requests for outdated or vulnerable dependencies of legacy/ and for the
+# pinned GitHub Actions. Upstream's Rust and bench dependencies are left to upstream.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /legacy
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
