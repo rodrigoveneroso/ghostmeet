@@ -4,7 +4,7 @@
 
 # ghostmeet
 
-**Your invisible AI meeting assistant** — Live captions and smart summaries, right in your browser.
+**Your invisible meeting recorder** — Live captions and local transcripts, right in your browser.
 
 [Quick Start](#quick-start) • [How It Works](#how-it-works) • [Features](#features) • [API](#api)
 
@@ -42,7 +42,15 @@
 > - **More reliable capture.** The capture state survives Chrome putting the service
 >   worker to sleep during long meetings, Stop always stops the recorder, and a recorder
 >   left over from a previous session no longer corrupts the next one.
-> - **`start.sh` / `stop.sh`** to run the backend in the background.
+> - **`start.sh` / `stop.sh`** to run the backend in the background, and
+>   `GHOSTMEET_DATA_DIR` to keep the database outside the checkout.
+> - **New icon**, the 👻 from the side panel instead of the old logo.
+> - **Tested in a real browser.** Besides the unit tests, Playwright scripts check the
+>   microphone, a backend restart mid-meeting, following a Meet call and the popup (see
+>   [Development](#development)).
+>
+> Summaries are still in the backend (`POST /api/sessions/{id}/summarize`, with
+> `GHOSTMEET_ANTHROPIC_KEY`), but the extension no longer has a button for them.
 
 > **Renewing as MeetButler.** ghostmeet is becoming MeetButler, a desktop app for Windows
 > and macOS that records in-person meetings as well as web calls, fully on your machine.
@@ -58,9 +66,9 @@
 
 ## What is ghostmeet?
 
-ghostmeet silently captures audio from any browser tab — Google Meet, Zoom, Teams, or anything with sound — and transcribes it in real-time using Whisper. When the meeting ends, click **Summarize** and AI extracts key decisions, action items, and next steps.
+ghostmeet silently captures audio from any browser tab — Google Meet, Zoom, Teams, or anything with sound — together with your microphone, and transcribes it in real-time using Whisper. When the meeting ends you have a transcript, as markdown if you like, ready for the AI agent of your choice to summarise.
 
-It runs as a **Chrome Extension side panel**. Other participants can't see it. Like a ghost in your meeting. 👻
+It runs as a **Chrome extension**: a popup to start and stop, and a side panel with live captions only if you open it. Other participants can't see it. Like a ghost in your meeting. 👻
 
 - **100% local** — audio never leaves your machine
 - **No accounts** — no sign-up, no cloud, no subscriptions
@@ -70,32 +78,35 @@ It runs as a **Chrome Extension side panel**. Other participants can't see it. L
 
 - 🎙️ **Real-time transcription** — Whisper STT, updates every 10 seconds
 - ⏱️ **Built for long meetings** — cost per pass stays flat, so a 4-hour session behaves like a 4-minute one
-- 📋 **AI-powered summaries** — Key decisions, action items, next steps
+- 🗣️ **Who said what** — on Google Meet, each line is credited to the participant speaking
 - 💾 **Nothing is lost** — transcripts are written to SQLite as they happen and survive a restart
-- 🌏 **Per-meeting language** — pick the language in the side panel, or let Whisper detect it
+- 📝 **Markdown export** — one `.md` per meeting, named after it when it was scheduled
+- 🌏 **Your language** — set it once with `GHOSTMEET_LANGUAGE`, or let Whisper detect it
 - 🔒 **Self-hosted** — your audio stays on your machine, and the server listens on loopback only
 - 🐳 **One-command setup** — `docker compose up` and you're ready
-- 👻 **Invisible** — side panel UI, no one in the meeting knows
+- 👻 **Invisible** — nothing opens on its own, no one in the meeting knows
 
 ## How It Works
 
 ```
-Browser Tab (Zoom / Meet / Teams)
-    │ audio
-    ▼
+Browser Tab (Zoom / Meet / Teams)          Microphone
+    │ audio                                     │
+    ▼                                           ▼
 Chrome Extension
-    ├── service worker  — asks Chrome for a tab stream id
-    └── offscreen page  — records it, and plays it back so you still hear the meeting
+    ├── service worker  — asks Chrome for a tab stream id, follows the call
+    ├── offscreen page  — mixes tab + mic, records, reconnects if the backend drops
+    └── Meet scripts    — who is speaking, the meeting's name, in call or not
     │
     ▼  WebSocket (webm/opus, 1s chunks)
 Local Backend (FastAPI)
     ├── one demuxer per session  ──→ PCM appended to disk
     ├── Whisper reads only the newest window, never the whole recording
     ├── segments ──→ SQLite  +  live captions in the side panel
-    └── Claude API (on demand) ──→ Meeting Summary
+    └── on stop ──→ speaker names ──→ markdown export (or dropped if too short)
 ```
 
-Everything runs on your machine. The only external call is to Claude API when you click Summarize (optional — transcription works without it).
+Everything runs on your machine. Nothing is sent anywhere, unless you call the backend's
+optional summary endpoint, which uses the Claude API.
 
 Audio is decoded once as it arrives and kept on disk, and each transcription pass reads
 only a bounded window of it. That is what keeps a long meeting from getting slower and
@@ -114,14 +125,16 @@ slower, and keeps memory flat no matter how long you record.
 git clone https://github.com/rodrigoveneroso/ghostmeet.git
 cd ghostmeet/legacy
 
-# Copy and edit config (add your Anthropic API key for summaries)
+# Copy and edit config (meeting language, export folder, Whisper model)
 cp .env.example .env
 
 # Start with Docker
 docker compose up -d
 ```
 
-Backend is ready when you see `http://0.0.0.0:8877` in the logs.
+Backend is ready when you see `http://0.0.0.0:8877` in the logs. To get the markdown
+export out of the container, mount a folder and point `GHOSTMEET_EXPORT_DIR` at it in
+`docker-compose.yml`; `./start.sh` (manual install) reads `.env` instead.
 
 <details>
 <summary><strong>Manual install (without Docker)</strong></summary>
@@ -178,7 +191,7 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_MIN_DURATION_SEC` | `30` | Captures shorter than this, or without speech, are dropped when they stop (`0` keeps everything) |
 | `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Where the SQLite database and per-session files live |
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
-| `GHOSTMEET_ANTHROPIC_KEY` | — | Required for AI summaries |
+| `GHOSTMEET_ANTHROPIC_KEY` | — | Only for the optional summary endpoint |
 | `GHOSTMEET_HOST` | `127.0.0.1` | Server bind address (loopback — the API has no auth) |
 | `GHOSTMEET_PORT` | `8877` | Server port |
 
@@ -203,8 +216,8 @@ Set these in `.env` or `docker-compose.yml`:
 | `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish; `resume=<epoch ms>` continues a dropped session) |
 | `/ws/transcript/{id}` | WS | Live transcript stream |
 
-Sessions, transcripts and summaries are stored in `recordings/ghostmeet.db`, so every
-endpoint above keeps working after the backend restarts.
+Sessions, transcripts and summaries are stored in `recordings/ghostmeet.db` (or under
+`GHOSTMEET_DATA_DIR`), so every endpoint above keeps working after the backend restarts.
 
 ## Development
 
@@ -309,7 +322,9 @@ Then just ask your AI assistant:
 - [x] AI meeting summaries (Claude)
 - [x] Long meetings — flat cost per pass, tested to 4h+ of audio
 - [x] Transcripts survive a restart (SQLite)
-- [x] Per-session language selection
+- [x] Per-session language (`GHOSTMEET_LANGUAGE`, or `lang=` on `/ws/audio`)
+- [x] Your own voice in web calls (microphone mixed with the tab)
+- [x] Recording follows a Google Meet call
 - [ ] Meeting context input + file attach
 - [x] Speaker names on Google Meet (from the meeting's own audio indicators)
 - [ ] Speaker diarization from the audio itself (other meeting apps)
