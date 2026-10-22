@@ -55,8 +55,11 @@
 > - **More reliable capture.** The capture state survives Chrome putting the service
 >   worker to sleep during long meetings, Stop always stops the recorder, and a recorder
 >   left over from a previous session no longer corrupts the next one.
-> - **`start.sh` / `stop.sh`** to run the backend in the background, and
->   `GHOSTMEET_DATA_DIR` to keep the database outside the checkout.
+> - **One-command setup.** `./install.sh` sets everything up and starts the backend at
+>   every login; `./doctor.sh` says what is wrong and how to fix it.
+>   `GHOSTMEET_DATA_DIR` keeps the database outside the checkout.
+> - **Faster by default.** int8 on CPU (about twice float32's speed, same accuracy, see the
+>   measurements below) and Whisper preloaded, so the first capture starts at once.
 > - **New icon**, the 👻 from the side panel instead of the old logo.
 > - **Tested in a real browser.** Besides the unit tests, Playwright scripts check the
 >   microphone, a backend restart mid-meeting, following a Meet call and the popup (see
@@ -129,36 +132,51 @@ slower, and keeps memory flat no matter how long you record.
 
 ### Prerequisites
 
-- **Docker** (recommended) or Python 3.10+
+- Linux or macOS with **Python 3.10+** (or [uv](https://docs.astral.sh/uv/), which brings its own)
 - **Chrome** browser
 
-### 1) Start the backend
+### 1) Install the backend
 
 ```bash
 git clone https://github.com/rodrigoveneroso/ghostmeet.git
 cd ghostmeet/legacy
+./install.sh
+```
 
-# Copy and edit config (meeting language, export folder, Whisper model)
-cp .env.example .env
+The installer asks four questions (meeting language, Whisper model, a folder for the
+markdown copies, an optional vocabulary file) and then:
 
-# Start with Docker
+- creates the virtualenv and installs the dependencies (with uv when it is there),
+- writes `.env`, keeping yours if you already have one,
+- downloads the Whisper model, so your first meeting does not wait for it,
+- on Linux, installs a systemd **user** service: the backend starts at every login and
+  restarts if it ever crashes. No sudo anywhere.
+
+`./install.sh --yes` takes every default. Run it again any time; it only does what is
+missing. When something does not work, `./doctor.sh` says what and how to fix it:
+
+```text
+ghostmeet doctor
+  ✓ virtualenv with the dependencies (Python 3.12.15)
+  ✓ Whisper model 'small' is downloaded
+  ✓ the service starts the backend at login, and it is running
+  ✓ backend answering on 127.0.0.1:8877, Whisper loaded
+```
+
+`./start.sh` and `./stop.sh` start and stop it by hand (through the service when there is
+one).
+
+<details>
+<summary><strong>With Docker instead</strong></summary>
+
+```bash
+cp .env.example .env   # meeting language, Whisper model
 docker compose up -d
 ```
 
 Backend is ready when you see `http://0.0.0.0:8877` in the logs. To get the markdown
 export out of the container, mount a folder and point `GHOSTMEET_EXPORT_DIR` at it in
-`docker-compose.yml`; `./start.sh` (manual install) reads `.env` instead.
-
-<details>
-<summary><strong>Manual install (without Docker)</strong></summary>
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m backend
-```
-
-Note: First run downloads the Whisper model (~150MB for `base`).
+`docker-compose.yml`.
 </details>
 
 ### 2) Install Chrome Extension
@@ -327,6 +345,9 @@ legacy/
 │   ├── refine.py           # optional second pass with a larger model
 │   ├── hooks.py            # GHOSTMEET_ON_EXPORT
 │   └── models.py           # session model
+├── install.sh, doctor.sh   # set up and start at login; say what is wrong
+├── run.sh, start.sh, stop.sh  # run in the foreground; start and stop in the background
+├── tools/                  # Whisper benchmark, icon generator
 ├── tests/                  # pytest suite + extension tests
 ├── docker-compose.yml      # one-command deployment
 ├── Dockerfile              # backend container
