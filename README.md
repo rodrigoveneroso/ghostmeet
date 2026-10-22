@@ -1,143 +1,79 @@
-<p align="center">
-  <img src="assets/logo.jpg" width="200" alt="ghostmeet logo">
-</p>
-
-# ghostmeet
-
-**Your invisible meeting recorder** — Live captions and local transcripts, right in your browser.
-
-[Quick Start](#quick-start) • [How It Works](#how-it-works) • [Features](#features) • [API](#api)
+# 👻 ghostmeet
 
 [![legacy tests](https://github.com/rodrigoveneroso/ghostmeet/actions/workflows/legacy.yml/badge.svg)](https://github.com/rodrigoveneroso/ghostmeet/actions/workflows/legacy.yml)
 
-> **About this fork.** This is a fork of [Higangssh/ghostmeet](https://github.com/Higangssh/ghostmeet)
-> focused on the v0.1 Chrome extension + Python backend in [`legacy/`](legacy/), kept in
-> sync with upstream. It is tuned for everyday use with Google Meet and plain-text
-> transcripts you can hand to any AI agent:
->
-> - **Your voice too.** The meeting tab only carries the other participants, so the
->   microphone is mixed into the recording (asked once, on an extension page). No
->   headphones needed: the others' echo through your speakers is taken out (an echo
->   suppressor that uses the tab as its reference), and on Google Meet nothing of yours
->   is recorded while you are muted.
-> - **Who said what, on Google Meet.** Each exported line is credited to the participant
->   whose audio indicator was lit while it was said (`[02:26] Ana: …`). Lines where that
->   is unclear stay without a name rather than being guessed.
-> - **Follows the call.** Optionally, recording starts when you join a Google Meet call
->   and stops when you leave it (one click on the extension per meeting tab, which Chrome
->   requires before any tab can be captured).
-> - **Knows your words.** A vocabulary of names and jargon (`GHOSTMEET_VOCABULARY`, or a
->   file) is handed to Whisper, and on Google Meet so are the participants' names, so they
->   come out spelled right.
-> - **Marks and notes.** While recording, mark a moment or jot a note from the popup, or
->   mark without opening anything with Alt+Shift+M; they land in the transcript where
->   they were taken (`[12:34] 📝 Nota: …`).
-> - **Runs your command afterwards.** `GHOSTMEET_ON_EXPORT` runs a command of yours once
->   the transcript is written, e.g. to have your AI agent summarise it or post it.
-> - **Optional second pass.** With `GHOSTMEET_FINAL_MODEL`, a larger Whisper model
->   transcribes the whole meeting again after Stop, before the audio is deleted.
-> - **Named after the meeting.** A scheduled meeting's name and the Meet code go into the
->   session and the exported transcript.
-> - **No junk sessions.** Captures shorter than 30 s or without any speech are dropped
->   when they stop (`GHOSTMEET_MIN_DURATION_SEC`).
-> - **Survives a backend restart.** If the backend goes away mid-meeting, the extension
->   keeps recording into a queue, reconnects on its own and the session continues on the
->   same timeline.
-> - **No audio is kept.** Only the transcript is stored; the working PCM file is deleted at
->   the end of every session.
-> - **Markdown export.** Every finished meeting can be written to a folder as a `.md` file
->   (`GHOSTMEET_EXPORT_DIR`), ready to be read by Claude Code, Codex or any other agent.
-> - **Out of the way.** The side panel only opens when you ask for it; the popup shows
->   whether it is recording, for how long and how much is transcribed, then how the
->   transcription ended. No Summarize, Clear or language buttons: summarise the exported
->   markdown with the agent of your choice, and set the meeting language once in `.env`
->   (`GHOSTMEET_LANGUAGE`, e.g. `pt`).
-> - **In Portuguese.** The interface comes from `extension/_locales/` (Brazilian
->   Portuguese today; a language is one more `messages.json`).
-> - **More reliable capture.** The capture state survives Chrome putting the service
->   worker to sleep during long meetings, Stop always stops the recorder, and a recorder
->   left over from a previous session no longer corrupts the next one.
-> - **One-command setup.** `./install.sh` sets everything up and starts the backend at
->   every login; `./doctor.sh` says what is wrong and how to fix it.
->   `GHOSTMEET_DATA_DIR` keeps the database outside the checkout.
-> - **Faster by default.** int8 on CPU (about twice float32's speed, same accuracy, see the
->   measurements below) and Whisper preloaded, so the first capture starts at once.
-> - **New icon**, the 👻 from the side panel instead of the old logo.
-> - **Tested in a real browser.** Besides the unit tests, Playwright scripts check the
->   microphone, a backend restart mid-meeting, following a Meet call and the popup (see
->   [Development](#development)).
->
-> There is no built-in summary any more, nor any call to a cloud API: the transcript
-> is meant for the AI agent of your choice (see `GHOSTMEET_ON_EXPORT`).
+**A meeting recorder that never leaves your machine.** A Chrome extension captures the
+call and your microphone, a local Whisper transcribes it live, and every meeting ends as
+a markdown transcript with who said what, ready for the AI agent of your choice.
 
-> **Renewing as MeetButler.** ghostmeet is becoming MeetButler, a desktop app for Windows
-> and macOS that records in-person meetings as well as web calls, fully on your machine.
-> It is under development in `app/` and `crates/` and not ready to use yet. The Chrome
-> extension and Python backend described below are v0.1, now in [`legacy/`](legacy/), and
-> still work as documented.
+No bot joins the call, no account, no cloud, no API key.
 
----
+> This is a fork of [Higangssh/ghostmeet](https://github.com/Higangssh/ghostmeet) that
+> develops its v0.1 (the Chrome extension and the Python backend, in [`legacy/`](legacy/))
+> into a daily tool. Upstream is turning into a desktop app, MeetButler, in `app/` and
+> `crates/`, which this fork leaves untouched.
 
-<p align="center">
-  <img src="assets/demo.gif" alt="ghostmeet demo" width="800">
-</p>
+## What it does
 
-## What is ghostmeet?
+**Recording**
+- Captures any browser tab, Google Meet first, **plus your microphone**: a meeting tab
+  never plays your own voice back.
+- **No headphones needed.** An echo suppressor uses the tab as its reference and removes
+  the others' voices picked up again from your speakers.
+- **Invisible.** Nothing opens on its own; a red dot on the icon is the only sign. The
+  live captions are one click away.
+- **Follows the call** (optional): starts when you join a Meet call, stops when you leave.
+  Muted in Meet means nothing of yours is recorded.
+- **Survives a backend restart** mid-meeting: the extension queues audio and reconnects.
 
-ghostmeet silently captures audio from any browser tab — Google Meet, Zoom, Teams, or anything with sound — together with your microphone, and transcribes it in real-time using Whisper. When the meeting ends you have a transcript, as markdown if you like, ready for the AI agent of your choice to summarise.
+**Transcript**
+- **Who said what** on Google Meet, from the meeting's own audio indicators. A line whose
+  speaker is unclear keeps no name rather than a wrong one.
+- **Your vocabulary**, plus the participants' names, handed to Whisper so they come out
+  spelled right.
+- **Marks and notes** taken during the meeting (popup, or Alt+Shift+M) land in the
+  transcript where you took them.
+- **Named after the meeting** when it was scheduled.
+- Optional **second pass** with a larger model once the meeting is over.
 
-It runs as a **Chrome extension**: a popup to start and stop, and a side panel with live captions only if you open it. Other participants can't see it. Like a ghost in your meeting. 👻
+**Afterwards**
+- One **markdown file per meeting**, and a command of yours run on it
+  (`GHOSTMEET_ON_EXPORT`), e.g. to have your agent summarise it.
+- **No junk:** captures under 30 s or without speech are dropped.
+- **No audio is kept**, only the text.
 
-- **100% local** — audio never leaves your machine
-- **No accounts** — no sign-up, no cloud, no subscriptions
-- **Works everywhere** — any tab that plays audio
+## A transcript
 
-## Features
+What lands in your export folder (made-up meeting):
 
-- 🎙️ **Real-time transcription** — Whisper STT, updates every 10 seconds
-- ⏱️ **Built for long meetings** — cost per pass stays flat, so a 4-hour session behaves like a 4-minute one
-- 🗣️ **Who said what** — on Google Meet, each line is credited to the participant speaking
-- 💾 **Nothing is lost** — transcripts are written to SQLite as they happen and survive a restart
-- 📝 **Markdown export** — one `.md` per meeting, named after it when it was scheduled
-- 🌏 **Your language** — set it once with `GHOSTMEET_LANGUAGE`, or let Whisper detect it
-- 🔒 **Self-hosted** — your audio stays on your machine, and the server listens on loopback only
-- 🐳 **One-command setup** — `docker compose up` and you're ready
-- 👻 **Invisible** — nothing opens on its own, no one in the meeting knows
+```markdown
+# Weekly sync (05/01/2026 10:00)
 
-## How It Works
+- sessão: 20260105-100002
+- duração: 32:10
+- idioma: pt
+- status: stopped
+- meet: abc-defg-hij
+- falantes: estimados pelo indicador de áudio do Google Meet (aproximado)
 
-```
-Browser Tab (Zoom / Meet / Teams)          Microphone
-    │ audio                                     │
-    ▼                                           ▼
-Chrome Extension
-    ├── service worker  — asks Chrome for a tab stream id, follows the call
-    ├── offscreen page  — mixes tab + mic, records, reconnects if the backend drops
-    └── Meet scripts    — who is speaking, the meeting's name, in call or not
-    │
-    ▼  WebSocket (webm/opus, 1s chunks)
-Local Backend (FastAPI)
-    ├── one demuxer per session  ──→ PCM appended to disk
-    ├── Whisper reads only the newest window, never the whole recording
-    ├── segments ──→ SQLite  +  live captions in the side panel
-    └── on stop ──→ speaker names ──→ markdown export (or dropped if too short)
+## Transcrição
+
+[00:04] Ana Souza: Bom dia, vamos começar pelos números do mês.
+[00:41] Bruno Lima: O painel do Metabase está atrasado desde segunda.
+[01:02] 📌 Momento marcado
+[01:05] Ana Souza: Então a decisão é corrigir a integração antes de sexta.
+[01:12] Combinado.
+[01:15] 📝 Nota: Bruno fica com a integração
 ```
 
-Everything runs on your machine, and the backend never calls out: no cloud API, no
-telemetry. What happens to a transcript afterwards is up to you.
+The interface and the transcript headings are in Brazilian Portuguese; the interface
+text lives in `legacy/extension/_locales/`, so another language is one more file.
 
-Audio is decoded once as it arrives and kept on disk, and each transcription pass reads
-only a bounded window of it. That is what keeps a long meeting from getting slower and
-slower, and keeps memory flat no matter how long you record.
+## Install
 
-## Quick Start
-
-### Prerequisites
-
-- Linux or macOS with **Python 3.10+** (or [uv](https://docs.astral.sh/uv/), which brings its own)
-- **Chrome** browser
-
-### 1) Install the backend
+You need Chrome, Python 3.10+ (or [uv](https://docs.astral.sh/uv/), which brings its own)
+and Linux, where everything here is tested. macOS should work through `./start.sh`, but
+gets no autostart and has not been tried.
 
 ```bash
 git clone https://github.com/rodrigoveneroso/ghostmeet.git
@@ -145,17 +81,15 @@ cd ghostmeet/legacy
 ./install.sh
 ```
 
-The installer asks four questions (meeting language, Whisper model, a folder for the
-markdown copies, an optional vocabulary file) and then:
+It asks four questions (meeting language, Whisper model, a folder for the transcripts,
+an optional vocabulary file), sets up a virtualenv, downloads the model and, on Linux,
+installs a systemd user service that starts the backend at every login and restarts it
+if it dies. No sudo. Run it again any time: it only does what is missing.
 
-- creates the virtualenv and installs the dependencies (with uv when it is there),
-- writes `.env`, keeping yours if you already have one,
-- downloads the Whisper model, so your first meeting does not wait for it,
-- on Linux, installs a systemd **user** service: the backend starts at every login and
-  restarts if it ever crashes. No sudo anywhere.
+Then load the extension: `chrome://extensions` → Developer mode → **Load unpacked** →
+`legacy/extension`, and pin the 👻.
 
-`./install.sh --yes` takes every default. Run it again any time; it only does what is
-missing. When something does not work, `./doctor.sh` says what and how to fix it:
+When something does not work, `./doctor.sh` says what and how to fix it:
 
 ```text
 ghostmeet doctor
@@ -165,236 +99,134 @@ ghostmeet doctor
   ✓ backend answering on 127.0.0.1:8877, Whisper loaded
 ```
 
-`./start.sh` and `./stop.sh` start and stop it by hand (through the service when there is
-one).
+`./start.sh` and `./stop.sh` start and stop the backend by hand. A `docker compose up -d`
+setup is in `legacy/` too, without the service and not covered by the CI.
 
-<details>
-<summary><strong>With Docker instead</strong></summary>
+## Use
+
+1. In the meeting tab, click 👻 → **▶ Iniciar gravação**. The first time, a tab asks for
+   your microphone.
+2. While it records, the popup shows for how long and how much is transcribed, and lets
+   you **📌 mark the moment** or type a note. **Alt+Shift+M** marks without opening it.
+3. **■ Parar gravação.** The popup says when the transcript is done, and the markdown is
+   in your export folder.
+
+To have recording follow the call, tick **Iniciar e parar junto com a chamada**. Chrome
+lets an extension capture a tab only after you clicked it there, so open the popup once
+per meeting tab (the lobby is fine); if you join without it, the icon shows **REC**.
+
+**With an AI agent.** Point it at the export folder, or let ghostmeet call it when each
+transcript is written:
 
 ```bash
-cp .env.example .env   # meeting language, Whisper model
-docker compose up -d
+# in legacy/.env (single quotes: the file is read by a shell)
+GHOSTMEET_ON_EXPORT='claude -p "Summarise $GHOSTMEET_TRANSCRIPT" > "${GHOSTMEET_TRANSCRIPT%.md}.summary.md"'
 ```
 
-Backend is ready when you see `http://0.0.0.0:8877` in the logs. To get the markdown
-export out of the container, mount a folder and point `GHOSTMEET_EXPORT_DIR` at it in
-`docker-compose.yml`.
-</details>
-
-### 2) Install Chrome Extension
-
-1. Open **chrome://extensions** in Chrome
-2. Enable **Developer mode** (toggle in top-right)
-3. Click **Load unpacked**
-4. Select the `legacy/extension/` folder from this repo
-5. Pin the 👻 icon in your toolbar
-
-### 3) Use it
-
-1. **Join a meeting** — Open Google Meet, Zoom, Teams (or any tab with audio)
-2. **Click 👻** — The popup says whether it is recording
-3. **Click ▶ Iniciar gravação** — Recording starts quietly: a red dot on the icon is the
-   only sign, and the tab stays audible. **Ver transcrição ao vivo** opens the side panel
-   with live captions if you want to watch them.
-   The first time, a tab asks for your microphone so your own voice is transcribed too.
-   Without headphones the echo of the others is removed; if your speakers are as loud
-   as your voice, what you say over someone may be cut, so headphones still do best.
-   To have recording follow the call instead, tick **Start and stop with the call** in the
-   popup: from then on, opening the popup once on a Meet tab (lobby or call) is enough;
-   if you join without it, the icon shows **REC** to ask for that click.
-   While it records, the popup can **📌 mark the moment** or take a note (type and press
-   Enter); **Alt+Shift+M** marks without opening anything.
-4. **Click ■ Parar gravação** — The popup says the transcription is being finished, then
-   shows its length and how many segments it has
-5. **Read the transcript** — in the side panel, through the API, or as markdown in
-   `GHOSTMEET_EXPORT_DIR` if you set it. Summarise it with the AI agent of your choice.
-
-Reopening the side panel mid-meeting brings the transcript so far back with it.
-
-That's it. No sign-up, no config, no cloud.
+`legacy/skill/SKILL.md` is an [OpenClaw](https://github.com/openclaw/openclaw) skill that
+reads sessions, transcripts and notes through the local API.
 
 ## Configuration
 
-Set these in `.env` or `docker-compose.yml`:
+`legacy/.env`, written by the installer and documented in `legacy/.env.example`:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GHOSTMEET_MODEL` | `base` | Whisper model size (`tiny` / `base` / `small` / `medium` / `large`) |
-| `GHOSTMEET_DEVICE` | `auto` | Compute device (`auto` / `cpu` / `cuda`) |
-| `GHOSTMEET_COMPUTE_TYPE` | `auto` | Precision; `auto` picks the fastest the hardware supports (`int8` on a CPU) |
-| `GHOSTMEET_PRELOAD` | `1` | Load Whisper when the backend starts, so the first capture does not wait (`0` loads it on first use) |
-| `GHOSTMEET_LANGUAGE` | auto-detect | Language of your meetings (`pt` / `en` / `ko` / etc.). There is no picker in the side panel |
-| `GHOSTMEET_EXPORT_DIR` | off | Folder that receives a markdown copy of every finished transcript |
-| `GHOSTMEET_MIN_DURATION_SEC` | `30` | Captures shorter than this, or without speech, are dropped when they stop (`0` keeps everything) |
-| `GHOSTMEET_VOCABULARY` | — | Names, acronyms and jargon to expect, comma separated (Meet participants are added on their own) |
-| `GHOSTMEET_VOCABULARY_FILE` | — | The same as a file, one term per line, re-read every session |
-| `GHOSTMEET_FINAL_MODEL` | off | Larger Whisper model that transcribes the meeting again after Stop (`medium`, `large-v3`…) |
-| `GHOSTMEET_ON_EXPORT` | — | Shell command run after each export, with `GHOSTMEET_TRANSCRIPT` & co. in its environment |
-| `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Where the SQLite database and per-session files live |
-| `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
-| `GHOSTMEET_HOST` | `127.0.0.1` | Server bind address (loopback — the API has no auth) |
-| `GHOSTMEET_PORT` | `8877` | Server port |
+| Variable | Default | |
+|---|---|---|
+| `GHOSTMEET_LANGUAGE` | detect | Language of your meetings (`pt`, `en`, …) |
+| `GHOSTMEET_MODEL` | `base` | Whisper model for the live transcript (`base`, `small`, …) |
+| `GHOSTMEET_EXPORT_DIR` | off | Folder for the markdown transcripts |
+| `GHOSTMEET_VOCABULARY` | — | Names and terms to expect, comma separated |
+| `GHOSTMEET_VOCABULARY_FILE` | — | The same, one per line, re-read every meeting |
+| `GHOSTMEET_ON_EXPORT` | — | Command run after each export (`GHOSTMEET_TRANSCRIPT`, `_SESSION_ID`, `_TITLE`, `_DURATION_SEC` in its environment) |
+| `GHOSTMEET_FINAL_MODEL` | off | Larger model that transcribes the meeting again after Stop |
+| `GHOSTMEET_MIN_DURATION_SEC` | `30` | Shorter captures, or silent ones, are dropped (`0` keeps all) |
+| `GHOSTMEET_COMPUTE_TYPE` | `auto` | Precision; `auto` picks the fastest the hardware has (int8 on a CPU) |
+| `GHOSTMEET_DEVICE` | `auto` | `cpu` or `cuda` |
+| `GHOSTMEET_PRELOAD` | `1` | Load Whisper at startup, so the first capture does not wait |
+| `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between live transcription passes |
+| `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Database and per-session files |
+| `GHOSTMEET_HOST`, `GHOSTMEET_PORT` | `127.0.0.1`, `8877` | Where the backend listens |
+| `GHOSTMEET_ALLOWED_HOSTS` | — | Extra host names accepted, only for a deliberate exposure |
 
-**Measured** on an AMD Ryzen 7 5825U (CPU only) with `legacy/tools/bench_whisper.py`, on
-46 s of Portuguese meeting speech made with a local TTS, using the backend's own settings:
+## How it works
 
-| Model | Precision | Time for 46 s | RTF | Word error rate |
-|-------|-----------|---------------|-----|-----------------|
-| `base` | `auto` (int8) | 3.7 s | 0.08 | 12.6% |
-| `small` | `auto` (int8) | 10.1 s | 0.22 | 12.6% |
-| `small` + vocabulary | `auto` (int8) | 10.8 s | 0.23 | 11.2% |
-| `small` | `float32` (upstream default) | 18.1 s | 0.39 | 13.3% |
+```
+Meet tab ──┐                                   ┌─ who is speaking, meeting name,
+Microphone ┴─ echo suppressor ─┐               │  participants, in call or muted
+                               ▼               │      (Meet content scripts)
+            Chrome extension (offscreen recorder) ──┘
+                               │ WebSocket, webm/opus, 1 s chunks (queued if the backend drops)
+                               ▼
+            Local backend (FastAPI, 127.0.0.1)
+              ├─ PCM appended to disk, Whisper reads only the newest window
+              ├─ segments → SQLite + live captions
+              └─ on Stop → speaker names, notes → markdown → your command
+                           (audio deleted; optional second pass first)
+```
 
-RTF is seconds of work per second of audio: anything well under 1 keeps up with the
-meeting. Run the tool on your own machine and recordings to choose.
+Each live pass reads a bounded window of the recording, so a four-hour meeting costs the
+same per pass as the first minute. The backend has no HTTP client at all: nothing it
+handles can leave the machine.
 
-**Model size guide:**
-- `tiny` — fastest, least accurate (~75MB)
-- `base` — good balance (recommended, ~150MB)
-- `small` — better accuracy, slower (~500MB)
-- `medium` / `large` — best accuracy, needs GPU
+## Performance
 
-## API
+`legacy/tools/bench_whisper.py` on an AMD Ryzen 7 5825U (CPU only), 46 s of Portuguese
+meeting speech from a local TTS, through the backend's own settings:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check + model info |
-| `/api/sessions` | GET | List all sessions |
-| `/api/sessions/{id}` | GET | Session details |
-| `/api/sessions/{id}/transcript` | GET | Full transcript |
-| `/api/sessions/{id}/meeting` | POST | Meeting name, code and participants from the meeting page (`{"title", "code", "participants"}`) |
-| `/api/sessions/{id}/notes` | GET / POST | Marks and notes taken during the meeting (`{"text", "at"}`, `at` in epoch ms) |
-| `/api/sessions/{id}/speaker-events` | POST | Google Meet participant UI changes, used to name speakers |
-| `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish; `resume=<epoch ms>` continues a dropped session) |
-| `/ws/transcript/{id}` | WS | Live transcript stream |
+| Model | Precision | Time for 46 s | Word error rate |
+|---|---|---|---|
+| `base` | int8 (`auto`) | 3.7 s | 12.6% |
+| `small` | int8 (`auto`) | 10.1 s | 12.6% |
+| `small` + vocabulary | int8 (`auto`) | 10.8 s | 11.2% |
+| `small` | float32 (upstream's default) | 18.1 s | 13.3% |
 
-Sessions, transcripts and notes are stored in `recordings/ghostmeet.db` (or under
-`GHOSTMEET_DATA_DIR`), so every endpoint above keeps working after the backend restarts.
+Run it on your own machine to choose a model.
+
+## Privacy and security
+
+Only the extension can talk to the backend: it listens on loopback, refuses web pages'
+origins (WebSockets included), DNS rebinding and undeclared request bodies, and keeps
+session files inside its data folder. Each of these has a test. The threat model, and how
+to report a vulnerability, are in [SECURITY.md](SECURITY.md).
 
 ## Development
 
-MeetButler (Rust, from the repository root):
-
-```bash
-cargo test --workspace                               # no model, no network
-```
-
-v0.1 (from `legacy/`):
-
 ```bash
 cd legacy
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
-
-./.venv/Scripts/python.exe -m pytest tests/ -q       # backend suite
-node --test tests/extension/shared.test.mjs          # extension helpers
+../.venv/bin/python -m pip install -r requirements-dev.txt
+../.venv/bin/python -m pytest tests/ -q            # backend, no model, no network
+node --test tests/extension/shared.test.mjs tests/extension/meet-dom.test.mjs \
+  tests/extension/echo-gate.test.mjs               # extension logic
 ```
 
-Every push to `legacy/` runs all of this on GitHub Actions (`.github/workflows/legacy.yml`):
-the unit suites and shellcheck, then the four real-browser checks under Xvfb with a real
-Whisper model. The suite needs no Whisper model and no network — real opus audio goes through the real
-decoder, and only inference is stubbed.
+The real-browser checks drive Chromium with the extension loaded against a real backend
+(`npm install playwright ws && npx playwright install chromium` first; the last two need
+port 8877 free):
 
-There is one thing tests cannot reach: `chrome.tabCapture.getMediaStreamId()` needs the
-`activeTab` grant that only a real toolbar click produces. Everything after that point is
-covered by `node tests/extension/verify-capture.mjs`, which drives the extension in a real
-browser against a running backend (needs `npm install playwright && npx playwright install
-chromium`). `node tests/extension/verify-mic-and-reconnect.mjs` starts its own backend on
-a throwaway data folder and checks that the echo suppressor runs as an AudioWorklet and
-removes a simulated echo, then, with Chromium's fake microphone, that your voice reaches
-the recording and that a capture survives the backend restarting mid-meeting.
-`node tests/extension/verify-follow-call.mjs` serves a stand-in Meet page and checks that
-joining and leaving are noticed, that the session takes the meeting's name, that
-nothing of yours is recorded while you are muted, and that a short capture is dropped. `node tests/extension/verify-popup.mjs` drives the popup through
-a whole capture. These two need port 8877 free: stop your own backend while they run.
-To check the last step by hand: start a capture on a tab with audio and confirm
-`audio_bytes` climbs in `/api/sessions` — and that you can still hear the tab.
+| Script | Checks |
+|---|---|
+| `verify-capture.mjs` | the recording path (upstream's) |
+| `verify-mic-and-reconnect.mjs` | the echo suppressor as an AudioWorklet, the microphone reaching the recording, a backend restart mid-meeting |
+| `verify-follow-call.mjs` | joining and leaving a stand-in Meet page, the meeting's name and participants, muting, dropping a short capture |
+| `verify-popup.mjs` | the popup through a whole capture, marks and notes |
 
-## Project Structure
+GitHub Actions runs all of it on every change to `legacy/` ([legacy.yml](.github/workflows/legacy.yml)).
 
 ```
-ghostmeet/
-├── app/                    # MeetButler desktop app (Tauri 2), in development
-├── crates/                 # MeetButler engine and audio capture (Rust)
-├── bench/                  # Korean STT engine benchmarks
-└── legacy/                 # v0.1, laid out as below
-
 legacy/
-├── extension/              # Chrome MV3 Extension
-│   ├── manifest.json       # permissions + side panel config
-│   ├── background.js       # service worker: gets a tab stream id, drives capture
-│   ├── offscreen.html/js   # hidden page that actually records → WebSocket
-│   ├── sidepanel.html/js   # live captions
-│   ├── meet-dom.js         # pure readers of the Meet page (in call? name? code?)
-│   ├── meet-call.js        # Meet content script: join/leave and the meeting's name
-│   ├── meet-speakers.js    # Meet content script: participant audio indicators
-│   ├── mic-permission.*    # the page where the microphone is granted once
-│   ├── echo-gate*.js       # echo suppression for the microphone (AudioWorklet)
-│   ├── popup.*             # what the capture is doing, and Start or Stop
-│   ├── i18n.js, _locales/  # interface text (pt_BR)
-│   ├── shared.js           # pure helpers shared by the above
-│   └── icons/              # drawn by tools/make_icons.py (Noto Color Emoji, Apache-2.0)
-├── backend/                # Python backend (FastAPI)
-│   ├── app.py              # HTTP + WebSocket server
-│   ├── decoder.py          # streaming webm/opus → PCM (one demuxer per session)
-│   ├── pcm_store.py        # append-only audio on disk, windowed reads
-│   ├── incremental.py      # bounded-window transcription, absolute timestamps
-│   ├── pipeline.py         # receive / decode / transcribe, decoupled
-│   ├── transcriber.py      # shared Whisper model + per-session language
-│   ├── store.py            # SQLite: sessions, segments, notes
-│   ├── exporter.py         # markdown copy of finished transcripts
-│   ├── speakers.py         # names each segment from the Meet audio indicators
-│   ├── retention.py        # which finished captures are worth keeping
-│   ├── vocabulary.py       # your terms + participants' names, as Whisper hotwords
-│   ├── refine.py           # optional second pass with a larger model
-│   ├── hooks.py            # GHOSTMEET_ON_EXPORT
-│   └── models.py           # session model
-├── install.sh, doctor.sh   # set up and start at login; say what is wrong
-├── run.sh, start.sh, stop.sh  # run in the foreground; start and stop in the background
-├── tools/                  # Whisper benchmark, icon generator
-├── tests/                  # pytest suite + extension tests
-├── docker-compose.yml      # one-command deployment
-├── Dockerfile              # backend container
-└── requirements.txt        # Python dependencies
+├── extension/       Chrome MV3 extension: popup, offscreen recorder, echo gate,
+│                    Meet content scripts, side panel, _locales/
+├── backend/         FastAPI app, streaming decoder, windowed transcription, SQLite,
+│                    speakers, vocabulary, export, second pass, on-export hook
+├── tests/           pytest suite, extension unit tests, real-browser checks
+├── tools/           Whisper benchmark, icon generator
+└── install.sh  doctor.sh  run.sh  start.sh  stop.sh
 ```
 
-## OpenClaw Integration
+## Credits
 
-ghostmeet works as an [OpenClaw](https://github.com/openclaw/openclaw) skill. Control your meetings from chat.
-
-```bash
-# Install the skill
-clawhub install ghostmeet
-```
-
-Then just ask your AI assistant:
-
-- **"Summarize my last meeting"** → the assistant reads the latest transcript and notes and summarises them
-- **"How many meetings did I have today?"** → lists all sessions
-- **"What did we decide about X?"** → searches the transcripts, with timestamps
-- **"Extract action items"** → reads the transcript and pulls out the tasks
-
-> The skill reads sessions, transcripts and notes through the local ghostmeet API; the assistant does the summarising. Recording start/stop is done through the Chrome Extension.
-
-## Roadmap
-
-- [x] Real-time transcription (Whisper)
-- [x] Chrome Extension side panel UI
-- [x] AI meeting summaries (upstream, removed here: your own agent summarises the transcript)
-- [x] Long meetings — flat cost per pass, tested to 4h+ of audio
-- [x] Transcripts survive a restart (SQLite)
-- [x] Per-session language (`GHOSTMEET_LANGUAGE`, or `lang=` on `/ws/audio`)
-- [x] Your own voice in web calls (microphone mixed with the tab)
-- [x] Recording follows a Google Meet call
-- [x] Custom vocabulary (plus the participants' names, on Google Meet)
-- [x] Marks and notes during the meeting
-- [ ] Meeting context input + file attach
-- [x] Speaker names on Google Meet (from the meeting's own audio indicators)
-- [ ] Speaker diarization from the audio itself (other meeting apps)
-- [ ] In-person meetings (microphone capture)
-- [x] Export to Markdown
-- [ ] Agent Mode — AI speaks in the meeting for you
-
-## License
+Built on [ghostmeet](https://github.com/Higangssh/ghostmeet) by Sanghee Son, which
+gave it the extension, the streaming backend and the long-meeting design. Icons from
+[Noto Color Emoji](https://github.com/googlefonts/noto-emoji) (Apache-2.0).
 
 [MIT](LICENSE)
