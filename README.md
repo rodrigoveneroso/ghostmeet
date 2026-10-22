@@ -34,7 +34,11 @@ No bot joins the call, no account, no cloud, no API key.
 - **Marks and notes** taken during the meeting (popup, or Alt+Shift+M) land in the
   transcript where you took them.
 - **Named after the meeting** when it was scheduled.
-- Optional **second pass** with a larger model once the meeting is over.
+- **Tidied on export:** words repeated where two transcription windows meet, and the
+  subtitle credits Whisper invents in silence ("Legendas pela comunidade Amara.org"),
+  are removed.
+- Optional **second pass** with a larger model once the meeting is over: with
+  `large-v3-turbo`, less than half the errors of the live transcript.
 
 **Afterwards**
 - One **markdown file per meeting**, and a command of yours run on it
@@ -138,7 +142,8 @@ reads sessions, transcripts and notes through the local API.
 | `GHOSTMEET_VOCABULARY` | — | Names and terms to expect, comma separated |
 | `GHOSTMEET_VOCABULARY_FILE` | — | The same, one per line, re-read every meeting |
 | `GHOSTMEET_ON_EXPORT` | — | Command run after each export (`GHOSTMEET_TRANSCRIPT`, `_SESSION_ID`, `_TITLE`, `_DURATION_SEC` in its environment) |
-| `GHOSTMEET_FINAL_MODEL` | off | Larger model that transcribes the meeting again after Stop |
+| `GHOSTMEET_FINAL_MODEL` | off | Larger model that transcribes the meeting again after Stop (`large-v3-turbo` recommended) |
+| `GHOSTMEET_FINAL_BEAM` | `1` | Beam size of that pass (turbo skipped sentences with 5) |
 | `GHOSTMEET_MIN_DURATION_SEC` | `30` | Shorter captures, or silent ones, are dropped (`0` keeps all) |
 | `GHOSTMEET_COMPUTE_TYPE` | `auto` | Precision; `auto` picks the fastest the hardware has (int8 on a CPU) |
 | `GHOSTMEET_DEVICE` | `auto` | `cpu` or `cuda` |
@@ -179,8 +184,14 @@ meeting speech from a local TTS, through the backend's own settings:
 | `small` | int8 (`auto`) | 10.1 s | 12.6% |
 | `small` + vocabulary | int8 (`auto`) | 10.8 s | 11.2% |
 | `small` | float32 (upstream's default) | 18.1 s | 13.3% |
+| `medium` | int8 (`auto`) | 24 s | 11.9% |
+| `large-v3-turbo`, beam 1 | int8 (`auto`) | 25 s | 7.7% |
+| `large-v3-turbo`, beam 5 | int8 (`auto`) | 26 s | 32.9% (skipped three sentences) |
 
-Run it on your own machine to choose a model.
+`small` keeps up live with room to spare; `large-v3-turbo` is too slow for that on a CPU
+but makes the best second pass: through the backend's own second-pass path, with the
+vocabulary and the export cleanup, it got the same speech down to **5.6%** errors, about
+half an hour of work for an hour of meeting. Run the tool on your own machine to choose.
 
 ## Privacy and security
 
