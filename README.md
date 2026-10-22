@@ -24,6 +24,16 @@
 > - **Follows the call.** Optionally, recording starts when you join a Google Meet call
 >   and stops when you leave it (one click on the extension per meeting tab, which Chrome
 >   requires before any tab can be captured).
+> - **Knows your words.** A vocabulary of names and jargon (`GHOSTMEET_VOCABULARY`, or a
+>   file) is handed to Whisper, and on Google Meet so are the participants' names, so they
+>   come out spelled right.
+> - **Marks and notes.** While recording, mark a moment or jot a note from the popup, or
+>   mark without opening anything with Alt+Shift+M; they land in the transcript where
+>   they were taken (`[12:34] 📝 Nota: …`).
+> - **Runs your command afterwards.** `GHOSTMEET_ON_EXPORT` runs a command of yours once
+>   the transcript is written, e.g. to have your AI agent summarise it or post it.
+> - **Optional second pass.** With `GHOSTMEET_FINAL_MODEL`, a larger Whisper model
+>   transcribes the whole meeting again after Stop, before the audio is deleted.
 > - **Named after the meeting.** A scheduled meeting's name and the Meet code go into the
 >   session and the exported transcript.
 > - **No junk sessions.** Captures shorter than 30 s or without any speech are dropped
@@ -172,6 +182,8 @@ Note: First run downloads the Whisper model (~150MB for `base`).
    To have recording follow the call instead, tick **Start and stop with the call** in the
    popup: from then on, opening the popup once on a Meet tab (lobby or call) is enough;
    if you join without it, the icon shows **REC** to ask for that click.
+   While it records, the popup can **📌 mark the moment** or take a note (type and press
+   Enter); **Alt+Shift+M** marks without opening anything.
 4. **Click ■ Parar gravação** — The popup says the transcription is being finished, then
    shows its length and how many segments it has
 5. **Read the transcript** — in the side panel, through the API, or as markdown in
@@ -193,6 +205,10 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_LANGUAGE` | auto-detect | Language of your meetings (`pt` / `en` / `ko` / etc.). There is no picker in the side panel |
 | `GHOSTMEET_EXPORT_DIR` | off | Folder that receives a markdown copy of every finished transcript |
 | `GHOSTMEET_MIN_DURATION_SEC` | `30` | Captures shorter than this, or without speech, are dropped when they stop (`0` keeps everything) |
+| `GHOSTMEET_VOCABULARY` | — | Names, acronyms and jargon to expect, comma separated (Meet participants are added on their own) |
+| `GHOSTMEET_VOCABULARY_FILE` | — | The same as a file, one term per line, re-read every session |
+| `GHOSTMEET_FINAL_MODEL` | off | Larger Whisper model that transcribes the meeting again after Stop (`medium`, `large-v3`…) |
+| `GHOSTMEET_ON_EXPORT` | — | Shell command run after each export, with `GHOSTMEET_TRANSCRIPT` & co. in its environment |
 | `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Where the SQLite database and per-session files live |
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
 | `GHOSTMEET_ANTHROPIC_KEY` | — | Only for the optional summary endpoint |
@@ -215,7 +231,8 @@ Set these in `.env` or `docker-compose.yml`:
 | `/api/sessions/{id}/transcript` | GET | Full transcript |
 | `/api/sessions/{id}/summarize` | POST | Generate AI summary |
 | `/api/sessions/{id}/summary` | GET | Get generated summary |
-| `/api/sessions/{id}/meeting` | POST | Meeting name and code from the meeting page (`{"title", "code"}`) |
+| `/api/sessions/{id}/meeting` | POST | Meeting name, code and participants from the meeting page (`{"title", "code", "participants"}`) |
+| `/api/sessions/{id}/notes` | GET / POST | Marks and notes taken during the meeting (`{"text", "at"}`, `at` in epoch ms) |
 | `/api/sessions/{id}/speaker-events` | POST | Google Meet participant UI changes, used to name speakers |
 | `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish; `resume=<epoch ms>` continues a dropped session) |
 | `/ws/transcript/{id}` | WS | Live transcript stream |
@@ -295,6 +312,9 @@ legacy/
 │   ├── exporter.py         # markdown copy of finished transcripts
 │   ├── speakers.py         # names each segment from the Meet audio indicators
 │   ├── retention.py        # which finished captures are worth keeping
+│   ├── vocabulary.py       # your terms + participants' names, as Whisper hotwords
+│   ├── refine.py           # optional second pass with a larger model
+│   ├── hooks.py            # GHOSTMEET_ON_EXPORT
 │   ├── summarizer.py       # Claude API integration
 │   └── models.py           # session model
 ├── tests/                  # pytest suite + extension tests
@@ -331,6 +351,8 @@ Then just ask your AI assistant:
 - [x] Per-session language (`GHOSTMEET_LANGUAGE`, or `lang=` on `/ws/audio`)
 - [x] Your own voice in web calls (microphone mixed with the tab)
 - [x] Recording follows a Google Meet call
+- [x] Custom vocabulary (plus the participants' names, on Google Meet)
+- [x] Marks and notes during the meeting
 - [ ] Meeting context input + file attach
 - [x] Speaker names on Google Meet (from the meeting's own audio indicators)
 - [ ] Speaker diarization from the audio itself (other meeting apps)
