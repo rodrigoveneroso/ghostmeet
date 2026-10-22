@@ -13,6 +13,14 @@
 > sync with upstream. It is tuned for everyday use with Google Meet and plain-text
 > transcripts you can hand to any AI agent:
 >
+> - **Your voice too.** The meeting tab only carries the other participants, so the
+>   microphone is mixed into the recording (asked once, on an extension page).
+> - **Who said what, on Google Meet.** Each exported line is credited to the participant
+>   whose audio indicator was lit while it was said (`[02:26] Ana: …`). Lines where that
+>   is unclear stay without a name rather than being guessed.
+> - **Survives a backend restart.** If the backend goes away mid-meeting, the extension
+>   keeps recording into a queue, reconnects on its own and the session continues on the
+>   same timeline.
 > - **No audio is kept.** Only the transcript is stored; the working PCM file is deleted at
 >   the end of every session.
 > - **Markdown export.** Every finished meeting can be written to a folder as a `.md` file
@@ -24,9 +32,6 @@
 >   worker to sleep during long meetings, Stop always stops the recorder, and a recorder
 >   left over from a previous session no longer corrupts the next one.
 > - **`start.sh` / `stop.sh`** to run the backend in the background.
-> - **Experimental:** on Google Meet, per-participant UI changes are logged next to the
->   session (`recordings/<id>.speakers.jsonl`) as raw material for telling speakers apart.
->   Nothing interprets them yet.
 
 > **Renewing as MeetButler.** ghostmeet is becoming MeetButler, a desktop app for Windows
 > and macOS that records in-person meetings as well as web calls, fully on your machine.
@@ -132,6 +137,8 @@ Note: First run downloads the Whisper model (~150MB for `base`).
 1. **Join a meeting** — Open Google Meet, Zoom, Teams (or any tab with audio)
 2. **Click 👻** — Side panel opens on the right
 3. **Click ▶ Start** — Live captions appear as people speak. The tab stays audible.
+   The first time, a tab asks for your microphone so your own voice is transcribed too.
+   Headphones keep the others from being picked up a second time through your speakers.
 4. **Click ■ Stop** — The panel says "Transcription complete" once the last pass finishes
 5. **Read the transcript** — in the side panel, through the API, or as markdown in
    `GHOSTMEET_EXPORT_DIR` if you set it. Summarise it with the AI agent of your choice.
@@ -151,6 +158,7 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_COMPUTE_TYPE` | `float32` | Precision (`int8` is much faster on CPU) |
 | `GHOSTMEET_LANGUAGE` | auto-detect | Language of your meetings (`pt` / `en` / `ko` / etc.). There is no picker in the side panel |
 | `GHOSTMEET_EXPORT_DIR` | off | Folder that receives a markdown copy of every finished transcript |
+| `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Where the SQLite database and per-session files live |
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
 | `GHOSTMEET_ANTHROPIC_KEY` | — | Required for AI summaries |
 | `GHOSTMEET_HOST` | `127.0.0.1` | Server bind address (loopback — the API has no auth) |
@@ -172,8 +180,8 @@ Set these in `.env` or `docker-compose.yml`:
 | `/api/sessions/{id}/transcript` | GET | Full transcript |
 | `/api/sessions/{id}/summarize` | POST | Generate AI summary |
 | `/api/sessions/{id}/summary` | GET | Get generated summary |
-| `/api/sessions/{id}/speaker-events` | POST | Raw Google Meet participant UI changes (experimental) |
-| `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish) |
+| `/api/sessions/{id}/speaker-events` | POST | Google Meet participant UI changes, used to name speakers |
+| `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish; `resume=<epoch ms>` continues a dropped session) |
 | `/ws/transcript/{id}` | WS | Live transcript stream |
 
 Sessions, transcripts and summaries are stored in `recordings/ghostmeet.db`, so every
@@ -205,7 +213,10 @@ There is one thing tests cannot reach: `chrome.tabCapture.getMediaStreamId()` ne
 `activeTab` grant that only a real toolbar click produces. Everything after that point is
 covered by `node tests/extension/verify-capture.mjs`, which drives the extension in a real
 browser against a running backend (needs `npm install playwright && npx playwright install
-chromium`). To check the last step by hand: start a capture on a tab with audio and confirm
+chromium`). `node tests/extension/verify-mic-and-reconnect.mjs` starts its own backend on
+a throwaway data folder and checks, with Chromium's fake microphone, that your voice
+reaches the recording and that a capture survives the backend restarting mid-meeting.
+To check the last step by hand: start a capture on a tab with audio and confirm
 `audio_bytes` climbs in `/api/sessions` — and that you can still hear the tab.
 
 ## Project Structure
@@ -223,7 +234,8 @@ legacy/
 │   ├── background.js       # service worker: gets a tab stream id, drives capture
 │   ├── offscreen.html/js   # hidden page that actually records → WebSocket
 │   ├── sidepanel.html/js   # live captions
-│   ├── meet-speakers.js    # Google Meet content script (experimental speaker events)
+│   ├── meet-speakers.js    # Google Meet content script: participant audio indicators
+│   ├── mic-permission.*    # the page where the microphone is granted once
 │   ├── popup.html/js       # start/stop controls
 │   ├── shared.js           # pure helpers shared by the above
 │   └── icons/
@@ -236,6 +248,7 @@ legacy/
 │   ├── transcriber.py      # shared Whisper model + per-session language
 │   ├── store.py            # SQLite: sessions, segments, summaries
 │   ├── exporter.py         # markdown copy of finished transcripts
+│   ├── speakers.py         # names each segment from the Meet audio indicators
 │   ├── summarizer.py       # Claude API integration
 │   └── models.py           # session model
 ├── tests/                  # pytest suite + extension tests
@@ -271,7 +284,8 @@ Then just ask your AI assistant:
 - [x] Transcripts survive a restart (SQLite)
 - [x] Per-session language selection
 - [ ] Meeting context input + file attach
-- [ ] Speaker diarization (who said what)
+- [x] Speaker names on Google Meet (from the meeting's own audio indicators)
+- [ ] Speaker diarization from the audio itself (other meeting apps)
 - [ ] In-person meetings (microphone capture)
 - [x] Export to Markdown
 - [ ] Agent Mode — AI speaks in the meeting for you
