@@ -8,6 +8,8 @@
 
 [Quick Start](#quick-start) • [How It Works](#how-it-works) • [Features](#features) • [API](#api)
 
+[![legacy tests](https://github.com/rodrigoveneroso/ghostmeet/actions/workflows/legacy.yml/badge.svg)](https://github.com/rodrigoveneroso/ghostmeet/actions/workflows/legacy.yml)
+
 > **About this fork.** This is a fork of [Higangssh/ghostmeet](https://github.com/Higangssh/ghostmeet)
 > focused on the v0.1 Chrome extension + Python backend in [`legacy/`](legacy/), kept in
 > sync with upstream. It is tuned for everyday use with Google Meet and plain-text
@@ -288,7 +290,9 @@ python -m venv .venv
 node --test tests/extension/shared.test.mjs          # extension helpers
 ```
 
-The suite needs no Whisper model and no network — real opus audio goes through the real
+Every push to `legacy/` runs all of this on GitHub Actions (`.github/workflows/legacy.yml`):
+the unit suites and shellcheck, then the four real-browser checks under Xvfb with a real
+Whisper model. The suite needs no Whisper model and no network — real opus audio goes through the real
 decoder, and only inference is stubbed.
 
 There is one thing tests cannot reach: `chrome.tabCapture.getMediaStreamId()` needs the

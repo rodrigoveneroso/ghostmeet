@@ -6,9 +6,12 @@
 name: ci
 
 on:
+  # fork: only when the desktop app or its benchmarks change; legacy/ has legacy.yml
   push:
     branches: [main]
+    paths: ["app/**", "crates/**", "bench/**", "Cargo.toml", "Cargo.lock", ".github/workflows/ci.yml"]
   pull_request:
+    paths: ["app/**", "crates/**", "bench/**", "Cargo.toml", "Cargo.lock", ".github/workflows/ci.yml"]
 
 permissions:
   contents: read

@@ -1,0 +1,94 @@
+# The Chrome extension and Python backend in legacy/. Unit suites first (no model, no
+# network), then the real-browser checks: Chromium with the extension loaded, a real
+# backend and a real Whisper model (base, cached between runs). No secrets. Actions are
+# pinned to commits, as in ci.yml.
+name: legacy
+
+on:
+  push:
+    branches: [main]
+    paths: ["legacy/**", ".github/workflows/legacy.yml"]
+  pull_request:
+    paths: ["legacy/**", ".github/workflows/legacy.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legacy-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: legacy
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: legacy/requirements*.txt
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Install
+        run: |
+          python -m venv ../.venv
+          ../.venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Backend tests
+        run: ../.venv/bin/python -m pytest tests/ -q
+      - name: Extension tests
+        run: >-
+          node --test tests/extension/shared.test.mjs tests/extension/meet-dom.test.mjs
+          tests/extension/echo-gate.test.mjs
+      - name: Shell scripts
+        run: shellcheck -x run.sh start.sh stop.sh install.sh doctor.sh
+
+  browser:
+    needs: unit
+    runs-on: ubuntu-latest
+    env:
+      GHOSTMEET_MODEL: base
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: legacy/requirements*.txt
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-base-v1
+      - name: Install
+        run: |
+          python -m venv ../.venv
+          ../.venv/bin/python -m pip install -r requirements.txt
+          npm install --no-save --no-package-lock playwright ws
+          npx playwright install --with-deps chromium
+      - name: Download the Whisper model
+        run: ../.venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='auto')"
+      - name: Microphone, echo suppression and a backend restart
+        run: xvfb-run -a node tests/extension/verify-mic-and-reconnect.mjs
+      - name: Following a Meet call
+        run: xvfb-run -a node tests/extension/verify-follow-call.mjs
+      - name: The popup
+        run: xvfb-run -a node tests/extension/verify-popup.mjs
+      - name: The recording path (upstream's check)
+        run: |
+          mkdir -p "$RUNNER_TEMP/data"
+          GHOSTMEET_PORT=8880 GHOSTMEET_DATA_DIR="$RUNNER_TEMP/data" GHOSTMEET_MIN_DURATION_SEC=0 \
+            ../.venv/bin/python -m backend > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for _ in $(seq 1 60); do curl -fs http://127.0.0.1:8880/api/health && break; sleep 1; done
+          GHOSTMEET_URL=http://127.0.0.1:8880 xvfb-run -a node tests/extension/verify-capture.mjs
