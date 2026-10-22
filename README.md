@@ -18,6 +18,13 @@
 > - **Who said what, on Google Meet.** Each exported line is credited to the participant
 >   whose audio indicator was lit while it was said (`[02:26] Ana: …`). Lines where that
 >   is unclear stay without a name rather than being guessed.
+> - **Follows the call.** Optionally, recording starts when you join a Google Meet call
+>   and stops when you leave it (one click on the extension per meeting tab, which Chrome
+>   requires before any tab can be captured).
+> - **Named after the meeting.** A scheduled meeting's name and the Meet code go into the
+>   session and the exported transcript.
+> - **No junk sessions.** Captures shorter than 30 s or without any speech are dropped
+>   when they stop (`GHOSTMEET_MIN_DURATION_SEC`).
 > - **Survives a backend restart.** If the backend goes away mid-meeting, the extension
 >   keeps recording into a queue, reconnects on its own and the session continues on the
 >   same timeline.
@@ -139,6 +146,9 @@ Note: First run downloads the Whisper model (~150MB for `base`).
 3. **Click ▶ Start** — Live captions appear as people speak. The tab stays audible.
    The first time, a tab asks for your microphone so your own voice is transcribed too.
    Headphones keep the others from being picked up a second time through your speakers.
+   To have recording follow the call instead, tick **Start and stop with the call** in the
+   popup: from then on, opening the popup once on a Meet tab (lobby or call) is enough;
+   if you join without it, the icon shows **REC** to ask for that click.
 4. **Click ■ Stop** — The panel says "Transcription complete" once the last pass finishes
 5. **Read the transcript** — in the side panel, through the API, or as markdown in
    `GHOSTMEET_EXPORT_DIR` if you set it. Summarise it with the AI agent of your choice.
@@ -158,6 +168,7 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_COMPUTE_TYPE` | `float32` | Precision (`int8` is much faster on CPU) |
 | `GHOSTMEET_LANGUAGE` | auto-detect | Language of your meetings (`pt` / `en` / `ko` / etc.). There is no picker in the side panel |
 | `GHOSTMEET_EXPORT_DIR` | off | Folder that receives a markdown copy of every finished transcript |
+| `GHOSTMEET_MIN_DURATION_SEC` | `30` | Captures shorter than this, or without speech, are dropped when they stop (`0` keeps everything) |
 | `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Where the SQLite database and per-session files live |
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
 | `GHOSTMEET_ANTHROPIC_KEY` | — | Required for AI summaries |
@@ -180,6 +191,7 @@ Set these in `.env` or `docker-compose.yml`:
 | `/api/sessions/{id}/transcript` | GET | Full transcript |
 | `/api/sessions/{id}/summarize` | POST | Generate AI summary |
 | `/api/sessions/{id}/summary` | GET | Get generated summary |
+| `/api/sessions/{id}/meeting` | POST | Meeting name and code from the meeting page (`{"title", "code"}`) |
 | `/api/sessions/{id}/speaker-events` | POST | Google Meet participant UI changes, used to name speakers |
 | `/ws/audio` | WS | Audio ingest (binary chunks; send `stop` as text to finish; `resume=<epoch ms>` continues a dropped session) |
 | `/ws/transcript/{id}` | WS | Live transcript stream |
@@ -216,6 +228,9 @@ browser against a running backend (needs `npm install playwright && npx playwrig
 chromium`). `node tests/extension/verify-mic-and-reconnect.mjs` starts its own backend on
 a throwaway data folder and checks, with Chromium's fake microphone, that your voice
 reaches the recording and that a capture survives the backend restarting mid-meeting.
+`node tests/extension/verify-follow-call.mjs` serves a stand-in Meet page and checks that
+joining and leaving are noticed, that the session takes the meeting's name and that a
+short capture is dropped (it needs port 8877 free: stop your own backend while it runs).
 To check the last step by hand: start a capture on a tab with audio and confirm
 `audio_bytes` climbs in `/api/sessions` — and that you can still hear the tab.
 
@@ -234,7 +249,9 @@ legacy/
 │   ├── background.js       # service worker: gets a tab stream id, drives capture
 │   ├── offscreen.html/js   # hidden page that actually records → WebSocket
 │   ├── sidepanel.html/js   # live captions
-│   ├── meet-speakers.js    # Google Meet content script: participant audio indicators
+│   ├── meet-dom.js         # pure readers of the Meet page (in call? name? code?)
+│   ├── meet-call.js        # Meet content script: join/leave and the meeting's name
+│   ├── meet-speakers.js    # Meet content script: participant audio indicators
 │   ├── mic-permission.*    # the page where the microphone is granted once
 │   ├── popup.html/js       # start/stop controls
 │   ├── shared.js           # pure helpers shared by the above
@@ -249,6 +266,7 @@ legacy/
 │   ├── store.py            # SQLite: sessions, segments, summaries
 │   ├── exporter.py         # markdown copy of finished transcripts
 │   ├── speakers.py         # names each segment from the Meet audio indicators
+│   ├── retention.py        # which finished captures are worth keeping
 │   ├── summarizer.py       # Claude API integration
 │   └── models.py           # session model
 ├── tests/                  # pytest suite + extension tests
