@@ -201,7 +201,8 @@ Set these in `.env` or `docker-compose.yml`:
 |----------|---------|-------------|
 | `GHOSTMEET_MODEL` | `base` | Whisper model size (`tiny` / `base` / `small` / `medium` / `large`) |
 | `GHOSTMEET_DEVICE` | `auto` | Compute device (`auto` / `cpu` / `cuda`) |
-| `GHOSTMEET_COMPUTE_TYPE` | `float32` | Precision (`int8` is much faster on CPU) |
+| `GHOSTMEET_COMPUTE_TYPE` | `auto` | Precision; `auto` picks the fastest the hardware supports (`int8` on a CPU) |
+| `GHOSTMEET_PRELOAD` | `1` | Load Whisper when the backend starts, so the first capture does not wait (`0` loads it on first use) |
 | `GHOSTMEET_LANGUAGE` | auto-detect | Language of your meetings (`pt` / `en` / `ko` / etc.). There is no picker in the side panel |
 | `GHOSTMEET_EXPORT_DIR` | off | Folder that receives a markdown copy of every finished transcript |
 | `GHOSTMEET_MIN_DURATION_SEC` | `30` | Captures shorter than this, or without speech, are dropped when they stop (`0` keeps everything) |
@@ -213,6 +214,19 @@ Set these in `.env` or `docker-compose.yml`:
 | `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between transcription updates |
 | `GHOSTMEET_HOST` | `127.0.0.1` | Server bind address (loopback — the API has no auth) |
 | `GHOSTMEET_PORT` | `8877` | Server port |
+
+**Measured** on an AMD Ryzen 7 5825U (CPU only) with `legacy/tools/bench_whisper.py`, on
+46 s of Portuguese meeting speech made with a local TTS, using the backend's own settings:
+
+| Model | Precision | Time for 46 s | RTF | Word error rate |
+|-------|-----------|---------------|-----|-----------------|
+| `base` | `auto` (int8) | 3.7 s | 0.08 | 12.6% |
+| `small` | `auto` (int8) | 10.1 s | 0.22 | 12.6% |
+| `small` + vocabulary | `auto` (int8) | 10.8 s | 0.23 | 11.2% |
+| `small` | `float32` (upstream default) | 18.1 s | 0.39 | 13.3% |
+
+RTF is seconds of work per second of audio: anything well under 1 keeps up with the
+meeting. Run the tool on your own machine and recordings to choose.
 
 **Model size guide:**
 - `tiny` — fastest, least accurate (~75MB)
