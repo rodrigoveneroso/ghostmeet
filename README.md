@@ -14,7 +14,10 @@
 > transcripts you can hand to any AI agent:
 >
 > - **Your voice too.** The meeting tab only carries the other participants, so the
->   microphone is mixed into the recording (asked once, on an extension page).
+>   microphone is mixed into the recording (asked once, on an extension page). No
+>   headphones needed: the others' echo through your speakers is taken out (an echo
+>   suppressor that uses the tab as its reference), and on Google Meet nothing of yours
+>   is recorded while you are muted.
 > - **Who said what, on Google Meet.** Each exported line is credited to the participant
 >   whose audio indicator was lit while it was said (`[02:26] Ana: …`). Lines where that
 >   is unclear stay without a name rather than being guessed.
@@ -164,7 +167,8 @@ Note: First run downloads the Whisper model (~150MB for `base`).
    only sign, and the tab stays audible. **Ver transcrição ao vivo** opens the side panel
    with live captions if you want to watch them.
    The first time, a tab asks for your microphone so your own voice is transcribed too.
-   Headphones keep the others from being picked up a second time through your speakers.
+   Without headphones the echo of the others is removed; if your speakers are as loud
+   as your voice, what you say over someone may be cut, so headphones still do best.
    To have recording follow the call instead, tick **Start and stop with the call** in the
    popup: from then on, opening the popup once on a Meet tab (lobby or call) is enough;
    if you join without it, the icon shows **REC** to ask for that click.
@@ -246,11 +250,12 @@ There is one thing tests cannot reach: `chrome.tabCapture.getMediaStreamId()` ne
 covered by `node tests/extension/verify-capture.mjs`, which drives the extension in a real
 browser against a running backend (needs `npm install playwright && npx playwright install
 chromium`). `node tests/extension/verify-mic-and-reconnect.mjs` starts its own backend on
-a throwaway data folder and checks, with Chromium's fake microphone, that your voice
-reaches the recording and that a capture survives the backend restarting mid-meeting.
+a throwaway data folder and checks that the echo suppressor runs as an AudioWorklet and
+removes a simulated echo, then, with Chromium's fake microphone, that your voice reaches
+the recording and that a capture survives the backend restarting mid-meeting.
 `node tests/extension/verify-follow-call.mjs` serves a stand-in Meet page and checks that
-joining and leaving are noticed, that the session takes the meeting's name and that a
-short capture is dropped. `node tests/extension/verify-popup.mjs` drives the popup through
+joining and leaving are noticed, that the session takes the meeting's name, that
+nothing of yours is recorded while you are muted, and that a short capture is dropped. `node tests/extension/verify-popup.mjs` drives the popup through
 a whole capture. These two need port 8877 free: stop your own backend while they run.
 To check the last step by hand: start a capture on a tab with audio and confirm
 `audio_bytes` climbs in `/api/sessions` — and that you can still hear the tab.
@@ -274,6 +279,7 @@ legacy/
 │   ├── meet-call.js        # Meet content script: join/leave and the meeting's name
 │   ├── meet-speakers.js    # Meet content script: participant audio indicators
 │   ├── mic-permission.*    # the page where the microphone is granted once
+│   ├── echo-gate*.js       # echo suppression for the microphone (AudioWorklet)
 │   ├── popup.*             # what the capture is doing, and Start or Stop
 │   ├── i18n.js, _locales/  # interface text (pt_BR)
 │   ├── shared.js           # pure helpers shared by the above
