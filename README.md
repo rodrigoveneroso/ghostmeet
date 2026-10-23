@@ -28,6 +28,9 @@ No bot joins the call, no account, no cloud, no API key.
   catches up at once.
 - **Follows the call** (optional): starts when you join a Meet call, stops when you leave.
   Muted in Meet means nothing of yours is recorded.
+- **Says so on the call itself.** A small pill at the top of the Meet page tells you when a
+  call is *not* being recorded (and where to click), then shows the recording time,
+  whether your voice is going in, and when the transcript is saved. Only you see it.
 - **Survives a backend restart** mid-meeting: the extension queues audio and reconnects.
 
 **Transcript**
@@ -214,7 +217,7 @@ cd legacy
 ../.venv/bin/python -m pip install -r requirements-dev.txt
 ../.venv/bin/python -m pytest tests/ -q            # backend, no model, no network
 node --test tests/extension/shared.test.mjs tests/extension/meet-dom.test.mjs \
-  tests/extension/echo-gate.test.mjs               # extension logic
+  tests/extension/echo-gate.test.mjs tests/extension/overlay-state.test.mjs  # extension logic
 ```
 
 The real-browser checks drive Chromium with the extension loaded against a real backend
@@ -225,7 +228,7 @@ port 8877 free):
 |---|---|
 | `verify-capture.mjs` | the recording path (upstream's) |
 | `verify-mic-and-reconnect.mjs` | the echo suppressor as an AudioWorklet, the microphone reaching the recording, a backend restart mid-meeting |
-| `verify-follow-call.mjs` | joining and leaving a stand-in Meet page, the meeting's name and participants, muting, dropping a short capture |
+| `verify-follow-call.mjs` | joining and leaving a stand-in Meet page, the status pill at each step, the meeting's name and participants, muting, dropping a short capture |
 | `verify-popup.mjs` | the popup through a whole capture, marks and notes |
 
 GitHub Actions runs all of it on every change to `legacy/` ([legacy.yml](.github/workflows/legacy.yml)).
@@ -233,7 +236,7 @@ GitHub Actions runs all of it on every change to `legacy/` ([legacy.yml](.github
 ```
 legacy/
 ├── extension/       Chrome MV3 extension: popup, offscreen recorder, echo gate,
-│                    Meet content scripts, side panel, _locales/
+│                    Meet content scripts and status pill, side panel, _locales/
 ├── backend/         FastAPI app, streaming decoder, windowed transcription, SQLite,
 │                    speakers, vocabulary, export, second pass, on-export hook
 ├── tests/           pytest suite, extension unit tests, real-browser checks
