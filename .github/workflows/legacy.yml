@@ -85,6 +85,8 @@ jobs:
         run: xvfb-run -a node tests/extension/verify-follow-call.mjs
       - name: The popup
         run: xvfb-run -a node tests/extension/verify-popup.mjs
+      - name: Reloading the extension under an open Meet tab
+        run: xvfb-run -a node tests/extension/verify-extension-reload.mjs
       - name: The recording path (upstream's check)
         run: |
           mkdir -p "$RUNNER_TEMP/data"

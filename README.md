@@ -230,6 +230,7 @@ port 8877 free):
 | `verify-mic-and-reconnect.mjs` | the echo suppressor as an AudioWorklet, the microphone reaching the recording, a backend restart mid-meeting |
 | `verify-follow-call.mjs` | joining and leaving a stand-in Meet page, the status pill at each step, the meeting's name and participants, muting, dropping a short capture |
 | `verify-popup.mjs` | the popup through a whole capture, marks and notes |
+| `verify-extension-reload.mjs` | reloading the extension with a Meet tab open: no orphaned script errors, the new scripts injected without reloading the tab |
 
 GitHub Actions runs all of it on every change to `legacy/` ([legacy.yml](.github/workflows/legacy.yml)).
 
