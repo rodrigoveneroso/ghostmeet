@@ -21,7 +21,11 @@ No bot joins the call, no account, no cloud, no API key.
 - **No headphones needed.** An echo suppressor uses the tab as its reference and removes
   the others' voices picked up again from your speakers.
 - **Invisible.** Nothing opens on its own; a red dot on the icon is the only sign. The
-  live captions are one click away.
+  live captions are one click away, and say who is speaking.
+- **Light while you meet.** With the live captions closed, Whisper runs in a batch every
+  five minutes instead of every ten seconds, at low priority: measured, the backend went
+  from 89 s of CPU during a 90 s meeting to under half a second. Opening the captions
+  catches up at once.
 - **Follows the call** (optional): starts when you join a Meet call, stops when you leave.
   Muted in Meet means nothing of yours is recorded.
 - **Survives a backend restart** mid-meeting: the extension queues audio and reconnects.
@@ -148,7 +152,9 @@ reads sessions, transcripts and notes through the local API.
 | `GHOSTMEET_COMPUTE_TYPE` | `auto` | Precision; `auto` picks the fastest the hardware has (int8 on a CPU) |
 | `GHOSTMEET_DEVICE` | `auto` | `cpu` or `cuda` |
 | `GHOSTMEET_PRELOAD` | `1` | Load Whisper at startup, so the first capture does not wait |
-| `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between live transcription passes |
+| `GHOSTMEET_CHUNK_INTERVAL` | `10` | Seconds between passes while the live captions are open |
+| `GHOSTMEET_IDLE_INTERVAL` | `300` | Seconds between batches while they are closed (`0`: always live) |
+| `GHOSTMEET_NICE` | `10` | CPU priority of the backend, so the call comes first (`0`: normal) |
 | `GHOSTMEET_DATA_DIR` | `legacy/recordings` | Database and per-session files |
 | `GHOSTMEET_HOST`, `GHOSTMEET_PORT` | `127.0.0.1`, `8877` | Where the backend listens |
 | `GHOSTMEET_ALLOWED_HOSTS` | — | Extra host names accepted, only for a deliberate exposure |
@@ -164,7 +170,8 @@ Microphone ┴─ echo suppressor ─┐               │  participants, in cal
                                ▼
             Local backend (FastAPI, 127.0.0.1)
               ├─ PCM appended to disk, Whisper reads only the newest window
-              ├─ segments → SQLite + live captions
+              │  (every 10 s with the captions open, in 5-minute batches otherwise)
+              ├─ segments, named by speaker → SQLite + live captions
               └─ on Stop → speaker names, notes → markdown → your command
                            (audio deleted; optional second pass first)
 ```
