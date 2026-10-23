@@ -28,9 +28,9 @@ No bot joins the call, no account, no cloud, no API key.
   catches up at once.
 - **Follows the call** (optional): starts when you join a Meet call, stops when you leave.
   Muted in Meet means nothing of yours is recorded.
-- **Says so on the call itself.** A small pill at the top of the Meet page tells you when a
-  call is *not* being recorded (and where to click), then shows the recording time,
-  whether your voice is going in, and when the transcript is saved. Only you see it.
+- **A button in Meet's own control bar.** A 👻 beside the leave button tells you when a
+  call is *not* being recorded (and where to click), shows the recording time while it
+  is, and opens a small panel to mark the moment or take a note. Only you see it.
 - **Survives a backend restart** mid-meeting: the extension queues audio and reconnects.
 
 **Transcript**
@@ -38,8 +38,8 @@ No bot joins the call, no account, no cloud, no API key.
   speaker is unclear keeps no name rather than a wrong one.
 - **Your vocabulary**, plus the participants' names, handed to Whisper so they come out
   spelled right.
-- **Marks and notes** taken during the meeting (popup, or Alt+Shift+M) land in the
-  transcript where you took them.
+- **Marks and notes** taken during the meeting (from the 👻 in the call, the popup, or
+  Alt+Shift+M) land in the transcript where you took them.
 - **Named after the meeting** when it was scheduled.
 - **Tidied on export:** words repeated where two transcription windows meet, and the
   subtitle credits Whisper invents in silence ("Legendas pela comunidade Amara.org"),
@@ -228,7 +228,7 @@ port 8877 free):
 |---|---|
 | `verify-capture.mjs` | the recording path (upstream's) |
 | `verify-mic-and-reconnect.mjs` | the echo suppressor as an AudioWorklet, the microphone reaching the recording, a backend restart mid-meeting |
-| `verify-follow-call.mjs` | joining and leaving a stand-in Meet page, the status pill at each step, the meeting's name and participants, muting, dropping a short capture |
+| `verify-follow-call.mjs` | joining and leaving a stand-in Meet page, the button in its control bar at each step with marks and notes, the meeting's name and participants, muting, dropping a short capture |
 | `verify-popup.mjs` | the popup through a whole capture, marks and notes |
 | `verify-extension-reload.mjs` | reloading the extension with a Meet tab open: no orphaned script errors, the new scripts injected without reloading the tab |
 
@@ -237,7 +237,7 @@ GitHub Actions runs all of it on every change to `legacy/` ([legacy.yml](.github
 ```
 legacy/
 ├── extension/       Chrome MV3 extension: popup, offscreen recorder, echo gate,
-│                    Meet content scripts and status pill, side panel, _locales/
+│                    Meet content scripts and control-bar button, side panel, _locales/
 ├── backend/         FastAPI app, streaming decoder, windowed transcription, SQLite,
 │                    speakers, vocabulary, export, second pass, on-export hook
 ├── tests/           pytest suite, extension unit tests, real-browser checks
