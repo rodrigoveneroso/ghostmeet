@@ -46,7 +46,7 @@ jobs:
       - name: Extension tests
         run: >-
           node --test tests/extension/shared.test.mjs tests/extension/meet-dom.test.mjs
-          tests/extension/echo-gate.test.mjs
+          tests/extension/echo-gate.test.mjs tests/extension/overlay-state.test.mjs
       - name: Shell scripts
         run: shellcheck -x run.sh start.sh stop.sh install.sh doctor.sh
 
